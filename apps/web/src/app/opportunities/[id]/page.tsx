@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import type { ArbitrageOpportunityDto, ExecutionPlan } from '@arb/shared';
+import type { ArbitrageOpportunityDto, ExecutionPlan } from '@/types';
 import {
   fetchOpportunity,
   fetchExecutionPlan,

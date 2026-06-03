@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ArbitrageOpportunityDto } from '@arb/shared';
+import type { ArbitrageOpportunityDto } from '@/types';
 import { fetchOpportunities } from '@/lib/api';
 import { OpportunityFilters, type FilterState } from '@/components/OpportunityFilters';
 import { OpportunityTable } from '@/components/OpportunityTable';

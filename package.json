@@ -11,7 +11,7 @@
     "dev:api": "npm run dev -w @arb/api",
     "dev:web": "npm run dev -w @arb/web",
     "build": "npm run build -w @arb/web",
-    "build:all": "npm run build --workspaces --if-present",
+    "build:all": "npm run build:server -w @arb/api && npm run build:types -w @arb/shared",
     "build:vercel": "npm run build -w @arb/web",
     "db:generate": "npm run db:generate -w @arb/api",
     "db:migrate": "npm run db:migrate -w @arb/api",

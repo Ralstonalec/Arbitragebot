@@ -1,4 +1,4 @@
-import type { ArbitrageOpportunityDto, ExecutionPlan } from '@arb/shared';
+import type { ArbitrageOpportunityDto, ExecutionPlan } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 

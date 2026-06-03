@@ -1,6 +1,6 @@
 'use client';
 
-import type { ArbitrageOpportunityDto } from '@arb/shared';
+import type { ArbitrageOpportunityDto } from '@/types';
 import Link from 'next/link';
 
 function minutesToStart(iso: string): number {
