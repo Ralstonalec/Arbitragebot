@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build:types": "tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
