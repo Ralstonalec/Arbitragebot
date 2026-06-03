@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Sportsbook {
+  id                String   @id @default(cuid())
+  name              String
+  region            String   @default("ON")
+  code              String   @unique
+  isOntarioLicensed Boolean  @default(false) @map("is_ontario_licensed")
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  providerMappings SportsbookProviderMapping[]
+  quotes           Quote[]
+  opportunityLegs  ArbitrageOpportunityLeg[]
+
+  @@map("sportsbooks")
+}
+
+model OddsProvider {
+  id        String           @id @default(cuid())
+  name      String
+  type      OddsProviderType
+  code      String           @unique
+  baseUrl   String?          @map("base_url")
+  isEnabled Boolean          @default(true) @map("is_enabled")
+  config    Json?
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  sportsbookMappings SportsbookProviderMapping[]
+  quotes             Quote[]
+  externalIdMaps     ExternalIdMap[]
+
+  @@map("odds_providers")
+}
+
+enum OddsProviderType {
+  aggregator
+  direct_feed
+  scraper
+}
+
+model SportsbookProviderMapping {
+  id               String @id @default(cuid())
+  sportsbookId     String @map("sportsbook_id")
+  oddsProviderId   String @map("odds_provider_id")
+  providerBookCode String @map("provider_book_code")
+
+  sportsbook   Sportsbook   @relation(fields: [sportsbookId], references: [id], onDelete: Cascade)
+  oddsProvider OddsProvider @relation(fields: [oddsProviderId], references: [id], onDelete: Cascade)
+
+  @@unique([oddsProviderId, providerBookCode])
+  @@map("sportsbook_provider_mappings")
+}
+
+model Sport {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  leagues League[]
+  events  Event[]
+
+  @@map("sports")
+}
+
+model League {
+  id        String   @id @default(cuid())
+  sportId   String   @map("sport_id")
+  name      String
+  slug      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sport Sport  @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  events Event[]
+
+  @@unique([sportId, slug])
+  @@map("leagues")
+}
+
+model Event {
+  id        String      @id @default(cuid())
+  sportId   String      @map("sport_id")
+  leagueId  String      @map("league_id")
+  homeTeam  String      @map("home_team")
+  awayTeam  String      @map("away_team")
+  startTime DateTime    @map("start_time")
+  status    EventStatus @default(scheduled)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  sport  Sport  @relation(fields: [sportId], references: [id])
+  league League @relation(fields: [leagueId], references: [id])
+  markets Market[]
+  opportunities ArbitrageOpportunity[]
+
+  @@index([startTime])
+  @@index([sportId, leagueId])
+  @@map("events")
+}
+
+enum EventStatus {
+  scheduled
+  live
+  completed
+  cancelled
+  postponed
+}
+
+model Market {
+  id         String     @id @default(cuid())
+  eventId    String     @map("event_id")
+  marketType MarketType @map("market_type")
+  sideCount  Int        @map("side_count")
+  parameters Json?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  outcomes Outcome[]
+
+  @@unique([eventId, marketType, parameters])
+  @@index([eventId, marketType])
+  @@map("markets")
+}
+
+enum MarketType {
+  moneyline
+  spread
+  total
+  three_way
+  prop_player
+  prop_team
+  other
+}
+
+model Outcome {
+  id        String   @id @default(cuid())
+  marketId  String   @map("market_id")
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  market Market  @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  quotes Quote[]
+  opportunityLegs ArbitrageOpportunityLeg[]
+
+  @@unique([marketId, label])
+  @@index([marketId, label])
+  @@map("outcomes")
+}
+
+model Quote {
+  id           String   @id @default(cuid())
+  outcomeId    String   @map("outcome_id")
+  sportsbookId String   @map("sportsbook_id")
+  providerId   String   @map("provider_id")
+  capturedAt   DateTime @map("captured_at")
+  decimalOdds  Decimal  @map("decimal_odds") @db.Decimal(12, 4)
+  impliedProb  Decimal  @map("implied_prob") @db.Decimal(12, 6)
+  isLive       Boolean  @default(false) @map("is_live")
+  lineVersion  String?  @map("line_version")
+
+  outcome    Outcome      @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  sportsbook Sportsbook   @relation(fields: [sportsbookId], references: [id])
+  provider   OddsProvider @relation(fields: [providerId], references: [id])
+
+  @@unique([outcomeId, sportsbookId, providerId])
+  @@index([outcomeId, sportsbookId])
+  @@index([capturedAt])
+  @@map("quotes")
+}
+
+model QuoteHistory {
+  id           String   @id @default(cuid())
+  outcomeId    String   @map("outcome_id")
+  sportsbookId String   @map("sportsbook_id")
+  providerId   String   @map("provider_id")
+  capturedAt   DateTime @map("captured_at")
+  decimalOdds  Decimal  @map("decimal_odds") @db.Decimal(12, 4)
+  impliedProb  Decimal  @map("implied_prob") @db.Decimal(12, 6)
+  isLive       Boolean  @default(false) @map("is_live")
+
+  @@index([outcomeId, capturedAt])
+  @@map("quote_history")
+}
+
+model ExternalIdMap {
+  id             String   @id @default(cuid())
+  entityType     String   @map("entity_type")
+  internalId     String   @map("internal_id")
+  oddsProviderId String?  @map("odds_provider_id")
+  sportsbookId   String?  @map("sportsbook_id")
+  externalKey    String   @map("external_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  oddsProvider OddsProvider? @relation(fields: [oddsProviderId], references: [id])
+
+  @@unique([entityType, oddsProviderId, externalKey])
+  @@index([internalId, entityType])
+  @@map("external_id_maps")
+}
+
+model ArbitrageOpportunity {
+  id                   String             @id @default(cuid())
+  eventId              String             @map("event_id")
+  marketType           MarketType         @map("market_type")
+  status               OpportunityStatus  @default(open)
+  arbType              ArbType            @map("arb_type")
+  marginPct            Decimal            @map("margin_pct") @db.Decimal(8, 4)
+  detectionReason      String             @map("detection_reason")
+  marketRiskScore      Int                @default(50) @map("market_risk_score")
+  dataFreshnessScore   Int                @default(50) @map("data_freshness_score")
+  executionDifficulty  Int                @default(50) @map("execution_difficulty")
+  totalSuggestedStake  Decimal?           @map("total_suggested_stake") @db.Decimal(12, 2)
+  theoreticalProfit    Decimal?           @map("theoretical_profit") @db.Decimal(12, 2)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  staleAt              DateTime?          @map("stale_at")
+
+  event         Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  legs          ArbitrageOpportunityLeg[]
+  explanations  AiExplanation[]
+  actionLogs    UserActionLog[]
+
+  @@index([status, createdAt])
+  @@index([eventId, marketType])
+  @@map("arbitrage_opportunities")
+}
+
+enum OpportunityStatus {
+  open
+  stale
+  executed
+  skipped
+}
+
+enum ArbType {
+  two_way
+  three_way
+  multi_leg
+  value_edge
+}
+
+model ArbitrageOpportunityLeg {
+  id              String  @id @default(cuid())
+  opportunityId   String  @map("opportunity_id")
+  sportsbookId    String  @map("sportsbook_id")
+  outcomeId       String  @map("outcome_id")
+  decimalOdds     Decimal @map("decimal_odds") @db.Decimal(12, 4)
+  impliedProb     Decimal @map("implied_prob") @db.Decimal(12, 6)
+  suggestedStake  Decimal @map("suggested_stake") @db.Decimal(12, 2)
+  sideLabel       String  @map("side_label")
+  sortOrder       Int     @default(0) @map("sort_order")
+
+  opportunity ArbitrageOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  sportsbook  Sportsbook           @relation(fields: [sportsbookId], references: [id])
+  outcome     Outcome              @relation(fields: [outcomeId], references: [id])
+
+  @@map("arbitrage_opportunity_legs")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  settings   UserSettings?
+  actionLogs UserActionLog[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique @map("user_id")
+  currency                String   @default("CAD")
+  defaultBankroll         Decimal  @default(2000) @map("default_bankroll") @db.Decimal(12, 2)
+  maxRiskPerBetPct        Decimal  @default(2) @map("max_risk_per_bet_pct") @db.Decimal(5, 2)
+  maxDailyLossPct         Decimal  @default(5) @map("max_daily_loss_pct") @db.Decimal(5, 2)
+  minArbEdgePct           Decimal  @default(0.5) @map("min_arb_edge_pct") @db.Decimal(5, 2)
+  minTimeToStartMinutes   Int      @default(15) @map("min_time_to_start_minutes")
+  leaguesWhitelist        String[] @default([]) @map("leagues_whitelist")
+  sportsbooksWhitelist    String[] @default([]) @map("sportsbooks_whitelist")
+  kellyFractionCap        Decimal  @default(0.25) @map("kelly_fraction_cap") @db.Decimal(5, 2)
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model UserActionLog {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  opportunityId String?  @map("opportunity_id")
+  actionType    String   @map("action_type")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunity ArbitrageOpportunity? @relation(fields: [opportunityId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("user_action_logs")
+}
+
+model AiExplanation {
+  id            String   @id @default(cuid())
+  opportunityId String   @map("opportunity_id")
+  briefText     String   @map("brief_text")
+  detailedText  String   @map("detailed_text") @db.Text
+  modelName     String   @map("model_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  opportunity ArbitrageOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId, createdAt])
+  @@map("ai_explanations")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}

@@ -1,0 +1,24 @@
+{
+  "name": "arb-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run dev -w @arb/api",
+    "dev:web": "npm run dev -w @arb/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:vercel": "npm run build -w @arb/shared && npm run build -w @arb/web",
+    "db:generate": "npm run db:generate -w @arb/api",
+    "db:migrate": "npm run db:migrate -w @arb/api",
+    "db:push": "npm run db:push -w @arb/api",
+    "db:seed": "npm run db:seed -w @arb/api",
+    "scan": "npm run scan -w @arb/api"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
