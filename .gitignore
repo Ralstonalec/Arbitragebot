@@ -1,6 +1,9 @@
 node_modules
 dist
 .next
+out
+apps/web/public
+apps/web/out
 .env
 .env.local
 *.log

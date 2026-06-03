@@ -1,22 +1,17 @@
 # Vercel deployment (apps/web)
 
-## Required project settings
-
-In **Vercel → Project → Settings → Build & Development Settings**:
+## Project settings
 
 | Setting | Value |
 |---------|--------|
 | Root Directory | `apps/web` |
-| Framework Preset | **Next.js** (not "Other") |
-| Output Directory | **leave completely empty** |
-| Build Command | empty (uses `vercel.json`) |
-| Install Command | empty (uses `vercel.json`) |
+| Framework Preset | **Other** or **Next.js** (build uses static export) |
+| Output Directory | `public` (set in `vercel.json`) |
+| Build Command | empty (uses `npm run build`) |
+| Install Command | empty (uses `npm install`) |
 
-If **Output Directory** is set to `public`, the deploy will fail or serve only static files.
-Next.js output lives in `.next` and is handled automatically by the Next.js preset.
-
-After changing settings, redeploy from the latest `main` branch.
+The build exports Next.js to `out/`, then copies to `public/` for Vercel.
 
 ## Environment
 
-- `NEXT_PUBLIC_API_URL` — URL of the deployed API (when available)
+- `NEXT_PUBLIC_API_URL` — your API base URL (required for live data)
