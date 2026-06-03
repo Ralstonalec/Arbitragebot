@@ -117,11 +117,22 @@ See `.env.example`. Secrets stay in env vars only.
 
 The dashboard (`apps/web`) deploys to Vercel. The API (`apps/api`) should run elsewhere (Railway, Render, Fly, etc.) with Postgres + Redis.
 
-1. Import the repo in Vercel — use root `vercel.json` (builds only `@arb/web`, not the API).
-2. Set **Environment variable**: `NEXT_PUBLIC_API_URL` = your deployed API URL.
-3. Redeploy after the API is live.
+### Required Vercel project settings
 
-Optional Vercel project setting: **Root Directory** = `apps/web` (if not using root `vercel.json`).
+| Setting | Value |
+|---------|--------|
+| **Root Directory** | `apps/web` |
+| **Framework Preset** | Next.js |
+| **Output Directory** | *(leave empty — default `.next`)* |
+| **Build Command** | *(leave empty — uses `apps/web/vercel.json`)* |
+
+Do **not** set Output Directory to `apps/web`; Next.js writes to `.next` inside the root directory.
+
+### Environment
+
+- `NEXT_PUBLIC_API_URL` = your deployed API URL (e.g. `https://your-api.onrender.com`)
+
+Redeploy after changing Root Directory or env vars.
 
 ## Next iterations
 
