@@ -127,7 +127,9 @@ The dashboard (`apps/web`) deploys to Vercel. The API (`apps/api`) should run el
 | **Install Command** | *(leave empty)* |
 | **Output Directory** | *(leave empty — default `.next`)* |
 
-The web app is **self-contained** (no monorepo workspace install on Vercel). Clear any custom Build/Install overrides that run `npm run build` from the repo root.
+The web app is **self-contained** (no monorepo workspace install on Vercel).
+
+**Important:** Framework must be **Next.js** and **Output Directory must be empty** (not `public`). See `apps/web/VERCEL.md`.
 
 ### Environment
 
