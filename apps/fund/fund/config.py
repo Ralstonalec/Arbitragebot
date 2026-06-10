@@ -45,6 +45,19 @@ ENABLED_SLEEVES = [
     if s.strip()
 ]
 
+# Absolute per-position dollar ceiling that applies ONLY in live mode, on
+# top of all percentage caps. Raise it deliberately as trust builds.
+MAX_LIVE_STAKE_USD = float(os.environ.get("MAX_LIVE_STAKE_USD", "250"))
+
+# Live Polymarket execution (FUND_LIVE=1 + a funded Polygon wallet).
+# The private key controls real money — env var only, never in code/git.
+POLYMARKET_PRIVATE_KEY = os.environ.get("POLYMARKET_PRIVATE_KEY", "")
+# If you deposited through the Polymarket site, your funds sit in a proxy
+# wallet: set its address here and signature type 1 (email login) or 2
+# (browser wallet). Direct EOA wallets use signature type 0 and no funder.
+POLYMARKET_FUNDER = os.environ.get("POLYMARKET_FUNDER", "")
+POLYMARKET_SIGNATURE_TYPE = int(os.environ.get("POLYMARKET_SIGNATURE_TYPE", "0"))
+
 # ------------------------------------------------------------------ risk ---
 KELLY_FRACTION = float(os.environ.get("KELLY_FRACTION", "0.25"))  # quarter-Kelly
 MAX_STAKE_PCT = float(os.environ.get("MAX_STAKE_PCT", "0.02"))    # per bet/copy

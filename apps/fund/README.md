@@ -111,15 +111,40 @@ the de-vigged sharp line ("positive CLV") is the most durable, documented
 edge in sports betting. Arbitrage legs are sized so every outcome pays the
 same amount.
 
-## Going live (please don't rush this)
+## Going live — drop money in, it decides
 
-- **markets**: set `FUND_LIVE=1` *and* generate live Alpaca keys. Only
-  after months of profitable paper records.
-- **polymarket**: live execution would require `py-clob-client` plus a
-  funded Polygon wallet, and is intentionally not wired up. If the paper
-  record holds up for months, that integration is the next step — ask for it.
-- **sportsbook**: paper-only forever by design; use the TS dashboard in
-  this repo (`apps/web`) as the execution assistant for a human.
+The fund is built so going live is one switch plus funded accounts. With
+`FUND_LIVE=1` it sizes every position off **actual balances**, not the
+paper bankroll number:
+
+1. **Preflight first** — validates every credential and prints what live
+   mode will do, without placing anything:
+   ```bash
+   python run.py --live-check
+   ```
+2. **Markets + insiders**: generate **live** Alpaca keys, fund the
+   account, set the keys. `FUND_LIVE=1` routes both sleeves to the live
+   endpoint; stakes scale off real account equity.
+3. **Polymarket**: deposit USDC (Polygon) into a Polymarket account, then:
+   ```bash
+   export POLYMARKET_PRIVATE_KEY="0x..."   # controls real funds — env only
+   export POLYMARKET_FUNDER="0x..."        # proxy wallet if you signed up on the site
+   export POLYMARKET_SIGNATURE_TYPE=1      # 1=email login, 2=browser wallet, 0=raw EOA
+   ```
+   Copies become real Fill-Or-Kill market orders; the sleeve syncs its
+   cash from your actual USDC balance every cycle. Resolved winners
+   need a one-click redeem in the Polymarket UI.
+4. **Sportsbook**: stays paper *structurally* — sportsbooks have no
+   execution API. It keeps producing settled +EV/arb records; placing
+   those bets is a human job (the TS dashboard assists).
+
+Live mode adds one extra brake on top of everything else: a hard
+`MAX_LIVE_STAKE_USD` ceiling (default **$250/position**) so percentage
+caps can't compound into big tickets while trust is being earned. The
+daily loss limit and the 15% drawdown kill switch apply to real money
+exactly as they do on paper. Raise the limits deliberately, in steps,
+as the live record accumulates — and only fund it with money you are
+truly fine losing.
 
 ## Architecture
 

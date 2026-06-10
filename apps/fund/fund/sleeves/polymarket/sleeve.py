@@ -18,10 +18,12 @@ How it works:
      PM_STOP_LOSS_FRAC below our entry, take-profit near 1.00, and
      settlement at 1/0 when the market resolves.
 
-Paper-only by design: fills are simulated at the CLOB midpoint and
-recorded in the fund ledger. Real execution would use py-clob-client with
-a funded wallet — do not bolt that on until months of paper results hold up,
-and remember a copy always enters AFTER the leader moved the price.
+Execution is paper by default: fills are simulated at the CLOB midpoint
+and recorded in the fund ledger. With FUND_LIVE=1 and a funded wallet
+(POLYMARKET_PRIVATE_KEY), fills become REAL Fill-Or-Kill market orders via
+py-clob-client, the sleeve's cash is synced from the actual USDC balance
+every cycle, and every stake is additionally clamped to MAX_LIVE_STAKE_USD.
+Remember a copy always enters AFTER the leader moved the price.
 """
 
 import time
@@ -29,10 +31,18 @@ import time
 from ... import config, risk
 from ..base import Sleeve
 from . import client
+from .executor import make_executor
 
 
 class PolymarketSleeve(Sleeve):
     name = "polymarket"
+
+    def __init__(self, ledger):
+        super().__init__(ledger)
+        try:
+            self.executor = make_executor()
+        except Exception as e:
+            self.disable(f"executor init failed: {e}")
 
     # ------------------------------------------------------------- leaders
     def _refresh_leaders(self, state: dict):
@@ -97,9 +107,16 @@ class PolymarketSleeve(Sleeve):
                 if t["side"] == "SELL" and asset in held:
                     pos = held.pop(asset)
                     mark = client.midpoint(asset) or pos.get("mark", pos["entry_price"])
-                    self.ledger.close_shares(pos, mark, f"leader {wallet[:8]} exited")
+                    exit_price = self.executor.sell(asset, pos["qty"], mark)
+                    if exit_price is None:
+                        self.log.error("LIVE sell failed for %s — keeping position",
+                                       pos["description"][:50])
+                        held[asset] = pos
+                        continue
+                    self.ledger.close_shares(pos, exit_price,
+                                             f"leader {wallet[:8]} exited")
                     self.log.info("COPY EXIT %s @ %.3f (leader sold)",
-                                  pos["description"][:50], mark)
+                                  pos["description"][:50], exit_price)
                     continue
 
                 if (t["side"] != "BUY" or not allow_entries
@@ -109,8 +126,11 @@ class PolymarketSleeve(Sleeve):
                         or not (config.PM_MIN_PRICE <= t["price"] <= config.PM_MAX_PRICE)):
                     continue
 
+                # symmetric slippage gate: if the market moved away from the
+                # leader's fill in EITHER direction we're no longer copying
+                # their trade — above = paying up, below = catching the knife
                 mid = client.midpoint(asset)
-                if mid is None or mid > t["price"] + config.PM_MAX_SLIPPAGE \
+                if mid is None or abs(mid - t["price"]) > config.PM_MAX_SLIPPAGE \
                         or not (config.PM_MIN_PRICE <= mid <= config.PM_MAX_PRICE):
                     continue
 
@@ -121,10 +141,13 @@ class PolymarketSleeve(Sleeve):
                 stake = min(stake, risk.capped_stake(equity, usd))
                 if stake < 5:
                     continue
-                qty = round(stake / mid, 2)
+                fill = self.executor.buy(asset, stake, mid)
+                if fill is None:
+                    continue
+                qty, fill_price = fill
                 desc = f"{t.get('title', asset[:16])} — {t.get('outcome', '?')}"
                 pos = self.ledger.open_shares(
-                    self.name, t["conditionId"], desc, qty, mid,
+                    self.name, t["conditionId"], desc, qty, fill_price,
                     meta={
                         "asset": asset,
                         "outcome_index": t.get("outcomeIndex", 0),
@@ -135,8 +158,9 @@ class PolymarketSleeve(Sleeve):
                 )
                 if pos:
                     held[asset] = pos
-                    self.log.info("COPY %s: $%.2f @ %.3f (leader %s @ %.3f)",
-                                  desc[:60], stake, mid, wallet[:8], t["price"])
+                    self.log.info("COPY %s: $%.2f @ %.3f (leader %s @ %.3f)%s",
+                                  desc[:60], stake, fill_price, wallet[:8],
+                                  t["price"], " [LIVE]" if self.executor.live else "")
 
     # ------------------------------------------------------------ positions
     def _manage_positions(self):
@@ -147,7 +171,10 @@ class PolymarketSleeve(Sleeve):
                                             pos["meta"]["outcome_index"])
             if settled is not None:
                 self.ledger.close_shares(pos, settled, "market resolved")
-                self.log.info("RESOLVED %s -> %.0f", pos["description"][:50], settled)
+                self.log.info("RESOLVED %s -> %.0f%s", pos["description"][:50],
+                              settled,
+                              "  ** redeem winnings in the Polymarket UI **"
+                              if self.executor.live and settled > 0 else "")
                 continue
 
             mid = client.midpoint(asset)
@@ -156,18 +183,30 @@ class PolymarketSleeve(Sleeve):
             pos["mark"] = mid
 
             if mid <= pos["entry_price"] * (1 - config.PM_STOP_LOSS_FRAC):
-                self.ledger.close_shares(pos, mid, "stop loss")
-                self.log.info("STOP %s @ %.3f (entry %.3f)",
-                              pos["description"][:50], mid, pos["entry_price"])
+                self._exit(pos, mid, "stop loss")
             elif mid >= config.PM_TAKE_PROFIT_PRICE:
-                self.ledger.close_shares(pos, mid, "take profit (near-resolved)")
-                self.log.info("TAKE PROFIT %s @ %.3f", pos["description"][:50], mid)
+                self._exit(pos, mid, "take profit (near-resolved)")
         self.ledger.save()
+
+    def _exit(self, pos: dict, mark: float, reason: str):
+        price = self.executor.sell(pos["meta"]["asset"], pos["qty"], mark)
+        if price is None:
+            self.log.error("LIVE sell failed for %s — keeping position",
+                           pos["description"][:50])
+            return
+        self.ledger.close_shares(pos, price, reason)
+        self.log.info("%s %s @ %.3f (entry %.3f)", reason.upper(),
+                      pos["description"][:50], price, pos["entry_price"])
 
     # ----------------------------------------------------------------- main
     def cycle(self, allow_entries: bool):
         if not self.enabled:
             return
+        if self.executor.live:
+            # size off real money: mirror the actual USDC balance as cash
+            bal = self.executor.usdc_balance()
+            if bal is not None:
+                self.ledger.state["cash"][self.name] = bal
         state = self.ledger.sleeve_state(self.name)
         self._refresh_leaders(state)
         self._manage_positions()

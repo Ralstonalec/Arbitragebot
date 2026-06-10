@@ -27,7 +27,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from ... import config
+from ... import config, risk
 from ..base import Sleeve
 from . import congress, edgar
 
@@ -115,8 +115,8 @@ class InsidersSleeve(Sleeve):
         if price is None or price <= 0:
             return
         equity = self.broker.equity()
-        stake = min(equity * config.INS_BASE_STAKE_PCT * weight,
-                    equity * config.MAX_STAKE_PCT * 2)
+        stake = risk._live_clamp(min(equity * config.INS_BASE_STAKE_PCT * weight,
+                                     equity * config.MAX_STAKE_PCT * 2))
         qty = int(stake / price)
         if qty < 1:
             self.log.info("%s: stake $%.0f < 1 share @ %.2f — skipped",

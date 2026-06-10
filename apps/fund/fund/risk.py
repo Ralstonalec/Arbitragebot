@@ -17,6 +17,13 @@ from . import config
 log = logging.getLogger("fund")
 
 
+def _live_clamp(stake: float) -> float:
+    """In live mode, an absolute dollar ceiling sits on top of all % caps."""
+    if not config.PAPER:
+        return min(stake, config.MAX_LIVE_STAKE_USD)
+    return stake
+
+
 def kelly_stake(equity: float, win_prob: float, decimal_odds: float) -> float:
     """Stake for a binary bet at decimal odds, fractional Kelly + cap."""
     b = decimal_odds - 1.0
@@ -26,12 +33,12 @@ def kelly_stake(equity: float, win_prob: float, decimal_odds: float) -> float:
     if edge <= 0:
         return 0.0
     frac = (edge / b) * config.KELLY_FRACTION
-    return round(min(frac, config.MAX_STAKE_PCT) * equity, 2)
+    return round(_live_clamp(min(frac, config.MAX_STAKE_PCT) * equity), 2)
 
 
 def capped_stake(equity: float, desired: float) -> float:
     """For copies where we have no calibrated win prob: flat cap sizing."""
-    return round(min(desired, config.MAX_STAKE_PCT * equity), 2)
+    return round(_live_clamp(min(desired, config.MAX_STAKE_PCT * equity)), 2)
 
 
 class RiskManager:
