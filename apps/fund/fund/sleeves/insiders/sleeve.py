@@ -10,7 +10,12 @@ Insiders sleeve — copy the people with information or skill edges:
      Congress, allies you configure, and Trump-linked tickers. Disclosures
      lag the actual trade by up to 45 days; that lag is the cost of this
      signal and it is priced in by smaller stakes.
-  2. Top stock traders: quarterly 13F filings of superinvestor funds
+  2. SEC Form 3/4 filers (INS_FORM4_FILERS — Donald J. Trump and
+     Donald Trump Jr. by default): their PERSONAL trades in companies
+     where they are officers/directors/10% owners, public within 2
+     business days. Open-market buys are parroted (with emphasis
+     weight), their sells close our copy, stock grants are ignored.
+  3. Top stock traders: quarterly 13F filings of superinvestor funds
      (Berkshire, Pershing Square, Duquesne, ...). New positions / >25%
      adds are copied at half weight (the data is 45+ days stale); a fund
      fully exiting closes our copy.
@@ -29,7 +34,7 @@ from datetime import datetime, timezone
 
 from ... import config, risk
 from ..base import Sleeve
-from . import congress, edgar
+from . import congress, edgar, form4
 
 STOP_PCT = 0.15
 SECONDS_PER_DAY = 86400
@@ -199,6 +204,34 @@ class InsidersSleeve(Sleeve):
             self._buy(t["ticker"], weight, source,
                       f"${t['usd']:,.0f} on {t['traded']}")
 
+    def _form4_cycle(self, allow_entries: bool):
+        """Parrot personal SEC Form 3/4 trades of configured insiders
+        (Trump et al.) — disclosed within 2 business days of the trade."""
+        state = self._state()
+        if (time.time() - state.get("form4_checked_at", 0)
+                < config.INS_FORM4_POLL_HOURS * 3600):
+            return
+        state["form4_checked_at"] = time.time()
+        form4_state = state.setdefault("form4", {})
+        positions = state.setdefault("positions", {})
+
+        for filer_name, cik in config.INS_FORM4_FILERS.items():
+            try:
+                signals = form4.new_signals(cik, filer_name, form4_state)
+            except Exception as e:
+                self.log.error("form4 %s failed: %s", filer_name, e)
+                continue
+            for s in signals:
+                source = f"form4:{s['filer']}"
+                if s["side"] == "sell":
+                    pos = positions.get(s["ticker"])
+                    if pos and pos["source"] == source:
+                        self._close(s["ticker"], f"{s['filer']} sold ({s['note']})")
+                elif allow_entries:
+                    weight = (config.INS_FORM4_WEIGHT
+                              * self._emphasis(s["filer"], s["ticker"]))
+                    self._buy(s["ticker"], weight, source, s["note"])
+
     def _edgar_cycle(self, allow_entries: bool):
         state = self._state()
         # check at most once a day — 13Fs are quarterly
@@ -231,5 +264,6 @@ class InsidersSleeve(Sleeve):
         self._reconcile()
         self._max_hold_exits()
         self._congress_cycle(allow_entries)
+        self._form4_cycle(allow_entries)
         self._edgar_cycle(allow_entries)
         self.ledger.save()

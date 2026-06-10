@@ -186,6 +186,25 @@ INS_EMPHASIS_TICKERS = {
 }
 INS_EMPHASIS_MULT = float(os.environ.get("INS_EMPHASIS_MULT", "2.0"))
 
+# SEC Form 3/4 filers to parrot — PERSONAL trades of named insiders,
+# public within 2 business days (the freshest "follow Trump's money"
+# signal that legally exists). {display name: CIK}; both defaults are
+# verified live EDGAR filers. Extend: INS_FORM4_FILERS="Name:CIK,..."
+INS_FORM4_FILERS = {
+    "Donald J. Trump": "0000947033",
+    "Donald Trump Jr.": "0002016181",
+}
+for _pair in os.environ.get("INS_FORM4_FILERS", "").split(","):
+    if ":" in _pair:
+        _name, _cik = _pair.rsplit(":", 1)
+        INS_FORM4_FILERS[_name.strip()] = _cik.strip()
+
+INS_FORM4_POLL_HOURS = float(os.environ.get("INS_FORM4_POLL_HOURS", "1"))
+INS_FORM4_WEIGHT = float(os.environ.get("INS_FORM4_WEIGHT", "1.0"))
+# First run: only filings newer than this are traded; older history is
+# snapshotted so we never buy a years-old disclosure.
+INS_FORM4_BOOTSTRAP_DAYS = int(os.environ.get("INS_FORM4_BOOTSTRAP_DAYS", "14"))
+
 # Superinvestor 13F funds to track: {display name: CIK}.
 INS_13F_FUNDS = {
     "Berkshire Hathaway (Buffett)": "0001067983",
