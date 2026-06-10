@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { aiRoutes } from './routes/ai.js';
 import { metaRoutes } from './routes/meta.js';
+import { fundRoutes } from './routes/fund.js';
 import { logger } from './lib/logger.js';
 
 initProviders();
@@ -32,6 +33,7 @@ await app.register(metaRoutes);
 await app.register(authRoutes);
 await app.register(opportunityRoutes);
 await app.register(aiRoutes);
+await app.register(fundRoutes);
 
 app.listen({ port: config.API_PORT, host: config.API_HOST }, (err) => {
   if (err) {

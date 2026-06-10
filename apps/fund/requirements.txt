@@ -1,0 +1,10 @@
+# Core (polymarket + sportsbook sleeves run on stdlib only)
+pandas>=2.0
+numpy>=1.24
+
+# Markets sleeve (Alpaca). Optional — the sleeve disables itself without keys,
+# but the import requires the package when the sleeve is enabled.
+alpaca-py>=0.21
+
+# Live Polymarket execution (only needed with FUND_LIVE=1 + a funded wallet)
+py-clob-client>=0.34
