@@ -2,33 +2,39 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Arb Intelligence',
-  description:
-    'Odds intelligence dashboard — theoretical arbitrage and edge detection. Not a gambling operator.',
+  title: 'Fund Dashboard',
+  description: 'Multi-sleeve trading fund — markets, Polymarket copy-trading, sports +EV, insider disclosures.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <header className="card" style={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}>
-          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <strong>Arb Intelligence</strong>
-              <span style={{ color: 'var(--muted)', marginLeft: '0.75rem', fontSize: '0.85rem' }}>
-                Odds research · execution assist only
-              </span>
+        <header style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <div className="container" style={{ display: 'flex', justifyContent: 'space-between',
+                                              alignItems: 'center', paddingTop: '0.75rem',
+                                              paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8,
+                            background: 'linear-gradient(135deg, #3d9eff 0%, #a78bfa 100%)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.8rem', fontWeight: 800, color: '#041018' }}>
+                F
+              </div>
+              <div>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Fund</span>
+                <span style={{ color: 'var(--muted)', marginLeft: '0.4rem', fontSize: '0.8rem' }}>
+                  intelligence
+                </span>
+              </div>
             </div>
-            <nav style={{ display: 'flex', gap: '1rem' }}>
-              <a href="/">Opportunities</a>
+            <nav style={{ display: 'flex', gap: '1.25rem', fontSize: '0.875rem' }}>
+              <a href="/" style={{ color: 'var(--text)', fontWeight: 500 }}>Portfolio</a>
+              <a href="/opportunities" style={{ color: 'var(--muted)' }}>Opportunities</a>
             </nav>
           </div>
         </header>
         <main>{children}</main>
-        <footer className="container disclaimer">
-          This platform does not accept wagers, hold customer funds, or access sportsbook accounts.
-          All betting occurs at licensed external sportsbooks at your own risk.
-        </footer>
       </body>
     </html>
   );
