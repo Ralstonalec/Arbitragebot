@@ -14,7 +14,19 @@ from datetime import datetime
 from ... import config
 from ..base import Sleeve
 from . import sizing
+from .simbroker import SimBroker
 from .strategies import get_signal, atr
+
+
+def make_broker(ledger):
+    """Alpaca when keys are set; otherwise the built-in paper account.
+    Live mode requires a real broker — no simulated fills with real intent."""
+    if config.ALPACA_API_KEY and config.ALPACA_SECRET_KEY:
+        from .broker import Broker
+        return Broker()
+    if not config.PAPER:
+        raise RuntimeError("FUND_LIVE=1 requires Alpaca keys (no sim fills live)")
+    return SimBroker(ledger)
 
 
 class MarketsSleeve(Sleeve):
@@ -26,17 +38,14 @@ class MarketsSleeve(Sleeve):
         self.broker = None
         self.last_bar_time = {}   # symbol -> timestamp of last bar acted on
         self.crypto_stops = {}    # symbol -> software stop price
-        if not config.ALPACA_API_KEY or not config.ALPACA_SECRET_KEY:
-            self.disable("ALPACA_API_KEY / ALPACA_SECRET_KEY not set")
-            return
         try:
-            from .broker import Broker
-            self.broker = Broker()
-            mode = "PAPER" if config.PAPER else "*** LIVE MONEY ***"
-            self.log.info(f"Markets sleeve up in {mode} mode. "
+            self.broker = make_broker(ledger)
+            mode = ("internal paper" if isinstance(self.broker, SimBroker)
+                    else "Alpaca PAPER" if config.PAPER else "*** LIVE MONEY ***")
+            self.log.info(f"Markets sleeve up ({mode}). "
                           f"Equity: ${self.broker.equity():,.2f}")
         except Exception as e:
-            self.disable(f"Alpaca init failed: {e}")
+            self.disable(f"broker init failed: {e}")
 
     def equity(self) -> float | None:
         if not self.enabled or self.broker is None:
@@ -107,8 +116,15 @@ class MarketsSleeve(Sleeve):
             if not sizing.correlation_filter_allows(symbol, positions):
                 self.log.info("%s: entry blocked by correlation filter", symbol)
                 return
+            # learner: instruments that keep stopping out get sized down/off
+            learner = getattr(self.ledger, "learner", None)
+            mult = learner.multiplier(self.name, symbol) if learner else 1.0
+            if mult <= 0:
+                self.log.info("%s: entry disabled by learner (losing record)", symbol)
+                return
             atr_val = atr(df, config.ATR_PERIOD)
             qty, stop = sizing.position_size(equity, price, atr_val)
+            qty = round(qty * mult, 6)
             if qty <= 0:
                 return
             self.broker.buy_with_stop(symbol, cfg["asset_class"], qty, stop)

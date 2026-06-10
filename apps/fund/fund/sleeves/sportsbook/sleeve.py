@@ -97,6 +97,7 @@ class SportsbookSleeve(Sleeve):
             return  # sharp book not quoting this event
         bets = ev.find_ev_bets(books, fair, config.SB_MIN_EV,
                                config.SB_MAX_DECIMAL_ODDS, config.SB_SHARP_BOOK)
+        learner = getattr(self.ledger, "learner", None)
         count = 0
         for b in bets:
             if count >= config.SB_MAX_BETS_PER_EVENT:
@@ -104,7 +105,11 @@ class SportsbookSleeve(Sleeve):
             key = self._bet_key(event["id"], b["outcome"], b["book"])
             if key in placed:
                 continue
-            stake = risk.kelly_stake(equity, b["fair_prob"], b["price"])
+            # learner: a book whose "+EV" bets keep losing gets cut/dropped
+            mult = learner.multiplier(self.name, b["book"]) if learner else 1.0
+            if mult <= 0:
+                continue
+            stake = risk.kelly_stake(equity, b["fair_prob"], b["price"]) * mult
             if stake < 1:
                 continue
             pos = self.ledger.open_bet(

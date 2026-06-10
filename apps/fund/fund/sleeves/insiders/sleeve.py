@@ -52,15 +52,11 @@ class InsidersSleeve(Sleeve):
     def __init__(self, ledger):
         super().__init__(ledger)
         self.broker = None
-        if not config.ALPACA_API_KEY or not config.ALPACA_SECRET_KEY:
-            self.disable("ALPACA_API_KEY / ALPACA_SECRET_KEY not set "
-                         "(insiders sleeve executes through Alpaca)")
-            return
         try:
-            from ..markets.broker import Broker
-            self.broker = Broker()
+            from ..markets.sleeve import make_broker
+            self.broker = make_broker(ledger)  # shares the sim account state
         except Exception as e:
-            self.disable(f"Alpaca init failed: {e}")
+            self.disable(f"broker init failed: {e}")
 
     def equity(self) -> float | None:
         return None  # cash lives in the Alpaca account, reported by markets
@@ -80,13 +76,7 @@ class InsidersSleeve(Sleeve):
                         qty, price, "", note])
 
     def _last_price(self, symbol: str) -> float | None:
-        try:
-            from alpaca.data.requests import StockLatestTradeRequest
-            req = StockLatestTradeRequest(symbol_or_symbols=symbol)
-            return float(self.broker.stock_data.get_stock_latest_trade(req)[symbol].price)
-        except Exception as e:
-            self.log.info("%s: no price (%s) — skipped", symbol, e)
-            return None
+        return self.broker.last_price(symbol)
 
     def _emphasis(self, politician: str, ticker: str) -> float:
         pol = politician.lower()
@@ -111,6 +101,14 @@ class InsidersSleeve(Sleeve):
                 or symbol in config.INSTRUMENTS
                 or len(positions) >= config.INS_MAX_POSITIONS):
             return
+        # learner: sources whose past copies lost get cut or dropped
+        learner = getattr(self.ledger, "learner", None)
+        mult = learner.multiplier(self.name, source) if learner else 1.0
+        if mult <= 0:
+            self.log.info("%s: skipped — %s dropped by learner (losing record)",
+                          symbol, source)
+            return
+        weight *= mult
         price = self._last_price(symbol)
         if price is None or price <= 0:
             return
@@ -131,6 +129,14 @@ class InsidersSleeve(Sleeve):
         self._log_trade("BUY", symbol, qty, price, f"{source}: {note} (w={weight:g})")
         self.log.info("COPY BUY %s x%d @ %.2f [%s] %s%s", symbol, qty, price,
                       source, note, " ★emphasis" if weight > 1 else "")
+        # attach the "why now": latest press releases for the ticker
+        try:
+            from ... import news
+            for item in news.search_news(symbol, days=7)[:2]:
+                self.log.info("  context: %s [%s] %s", item["date"],
+                              item["source"], item["title"][:80])
+        except Exception:
+            pass
 
     def _close(self, symbol: str, reason: str):
         positions = self._state().setdefault("positions", {})

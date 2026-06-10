@@ -85,6 +85,19 @@ class Broker:
             df = df.xs(symbol, level="symbol")
         return df[["open", "high", "low", "close", "volume"]]
 
+    def last_price(self, symbol: str) -> float | None:
+        try:
+            if "/" in symbol:
+                from alpaca.data.requests import CryptoLatestTradeRequest
+                req = CryptoLatestTradeRequest(symbol_or_symbols=symbol)
+                return float(self.crypto_data.get_crypto_latest_trade(req)[symbol].price)
+            from alpaca.data.requests import StockLatestTradeRequest
+            req = StockLatestTradeRequest(symbol_or_symbols=symbol)
+            return float(self.stock_data.get_stock_latest_trade(req)[symbol].price)
+        except Exception as e:
+            log.info("%s: no price (%s)", symbol, e)
+            return None
+
     # -------------------------------------------------------------- orders
     def buy_with_stop(self, symbol: str, asset_class: str, qty: float,
                       stop_price: float):

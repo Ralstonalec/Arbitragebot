@@ -12,8 +12,12 @@ The repo also ships a Python **multi-sleeve fund manager** that hunts for
 - **sportsbook** — +EV vs the de-vigged Pinnacle line + cross-book arbitrage (paper, auto-settled)
 - **insiders** — copies disclosed trades of US politicians (STOCK Act, with a configurable Trump-emphasis multiplier) and superinvestor 13F filings (Buffett, Ackman, Druckenmiller, …)
 
-Paper-first, fractional-Kelly sizing, daily loss limit, and a drawdown kill
-switch. See [`apps/fund/README.md`](apps/fund/README.md).
+Runs out of the box on a **built-in paper account** (live Yahoo prices, no
+signup), **self-learns** from realized outcomes (boosts winners, drops
+losing sources), and ships trade analytics (`--analyze`) plus a press-
+release/news search (`--news`). Paper-first, fractional-Kelly sizing, daily
+loss limit, and a drawdown kill switch, with a one-switch live mode. See
+[`apps/fund/README.md`](apps/fund/README.md).
 
 ## Architecture
 

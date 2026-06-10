@@ -66,6 +66,11 @@ class PolymarketSleeve(Sleeve):
         # consistency filter: profitable on BOTH windows
         windows = list(per_window.values())
         consistent = set(windows[0]).intersection(*windows[1:]) if windows else set()
+        # learning filter: never re-follow a wallet whose copies lost for us
+        learner = getattr(self.ledger, "learner", None)
+        if learner:
+            consistent = {w for w in consistent
+                          if not learner.blacklisted("polymarket", w)}
         ranked = sorted(consistent, key=lambda w: -per_window[config.PM_WINDOWS[-1]][w])
 
         leaders = list(dict.fromkeys(config.PM_FOLLOW_WALLETS + ranked))
@@ -91,7 +96,9 @@ class PolymarketSleeve(Sleeve):
     def _copy_entries(self, state: dict, allow_entries: bool):
         held = self._held_assets()
         seen = state.setdefault("last_seen_ts", {})
+        learner = getattr(self.ledger, "learner", None)
         for wallet in state.get("leaders", []):
+            mult = learner.multiplier(self.name, wallet) if learner else 1.0
             last_ts = seen.get(wallet, time.time() - 3600)
             trades = client.wallet_trades(wallet, limit=50)
             if not trades:
@@ -120,6 +127,7 @@ class PolymarketSleeve(Sleeve):
                     continue
 
                 if (t["side"] != "BUY" or not allow_entries
+                        or mult <= 0  # learner dropped this wallet
                         or asset in held
                         or usd < config.PM_MIN_LEADER_TRADE_USD
                         or self._is_short_term(t)
@@ -138,7 +146,7 @@ class PolymarketSleeve(Sleeve):
                 # treat the leader's fill price as an implied prob estimate
                 stake = risk.kelly_stake(equity, win_prob=min(mid + 0.05, 0.95),
                                          decimal_odds=1.0 / mid)
-                stake = min(stake, risk.capped_stake(equity, usd))
+                stake = min(stake, risk.capped_stake(equity, usd)) * mult
                 if stake < 5:
                     continue
                 fill = self.executor.buy(asset, stake, mid)

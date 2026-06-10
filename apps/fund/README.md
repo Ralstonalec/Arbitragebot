@@ -29,26 +29,82 @@ positive expected value and put capital only where an edge is measurable.
 - Nothing here is financial advice. Never fund this with money you can't
   afford to lose entirely.
 
-## Quick start
+## Quick start — zero accounts needed
 
 ```bash
 cd apps/fund
 pip install -r requirements.txt
+python run.py --once     # runs immediately on a built-in paper account
+```
 
-# minimum config — every key is optional, sleeves disable themselves gracefully
-export ALPACA_API_KEY="..."        # markets sleeve (free paper keys: alpaca.markets)
-export ALPACA_SECRET_KEY="..."
-export THE_ODDS_API_KEY="..."      # sportsbook sleeve (same key as the TS platform)
-                                   # polymarket sleeve needs NO key (public APIs)
+The **markets** and **insiders** sleeves trade through a built-in paper
+broker (`SimBroker`) that fills at live Yahoo Finance prices — no signup,
+no keys. **polymarket** needs no key at all (public APIs). Add keys only to
+upgrade realism or reach: an Alpaca paper key for true broker fills/stops,
+a `THE_ODDS_API_KEY` to enable the sportsbook sleeve.
 
-python run.py --once     # one scan cycle + status
-python run.py            # the loop (every 5 min)
-python run.py --status   # equity, open positions, halts
-python run.py --resume   # clear a risk halt after reviewing why it fired
+```bash
+export ALPACA_API_KEY=...  ALPACA_SECRET_KEY=...   # optional: real paper broker
+export THE_ODDS_API_KEY=...                        # optional: sportsbook sleeve
+
+python run.py              # the loop (every 5 min)
+python run.py --status     # equity, open positions, halts
+python run.py --analyze    # full trade-analytics report
+python run.py --learning   # what the bot has learned per source
+python run.py --news AAPL   # press releases & news for a ticker
+python run.py --live-check  # preflight before real money
+python run.py --resume      # clear a risk halt after reviewing why it fired
 ```
 
 All state lives in `apps/fund/data/` (gitignored): `ledger.json` (positions,
 cash, risk marks), `trades.csv` (every fill/settle with P&L), `fund.log`.
+
+## Self-learning — improving from mistakes
+
+Every closed trade is an outcome tied to a **source**: the leader wallet
+copied, the politician or 13F fund followed, the bookmaker bet at, the
+instrument traded. Each cycle the learner re-scores every source from its
+recent record and hands the sleeves a stake multiplier:
+
+| Evidence | Multiplier |
+|---|---|
+| < 4 closed trades | 1.0 (not enough evidence) |
+| losing money | 0.5 (probation — half stake) |
+| losing, 8+ trades, win rate < 35% | **0.0 — dropped**, stop copying |
+| profitable, win rate ≥ 55% | 1.25 (earned trust, capped) |
+
+So a Polymarket leader whose copies keep losing gets halved, then removed
+from the follow list; a politician whose disclosures don't pan out stops
+being copied; a bookmaker whose "+EV" bets don't settle positive stops
+getting bets; a strategy instrument that keeps stopping out is sized to
+zero. It's deliberately simple, bounded (boosts capped at 1.25×, hard risk
+caps still apply after), and transparent — scores recompute from the
+persistent trade record each cycle and survive restarts. Sources earn
+their way back automatically if later trades win, since scoring always
+reflects the recent window, never a permanent verdict. `python run.py
+--learning` shows the current verdicts; changes are logged to
+`ledger.json` under `learning_log`.
+
+## Trade analytics
+
+`python run.py --analyze` reads the ledger, `trades.csv`, and per-cycle
+`equity.csv` snapshots and reports:
+
+- **equity curve** — total return, annualized Sharpe, daily vol, max
+  drawdown, best/worst day
+- **per sleeve** — win rate, profit factor, expectancy, avg win/loss,
+  median hold time
+- **attribution** — which leaders, politicians, funds, books, and symbols
+  actually made the money (the piggyback hypothesis, measured)
+
+## Press releases & news
+
+`python run.py --news "NVDA"` merges three free sources, newest first:
+**SEC EDGAR 8-K** full-text search (where companies legally file material
+events, press release usually attached — the highest-signal source),
+**Yahoo Finance** news, and **Google News** RSS. The insiders sleeve calls
+this automatically on every copy, logging the latest releases for the
+ticker so each trade record carries its "why now" context.
 
 ## Fund-level risk (applies to all sleeves)
 
@@ -152,19 +208,25 @@ truly fine losing.
 run.py                      CLI entry
 fund/
   config.py                 all knobs, env-driven, PAPER-first
-  orchestrator.py           the loop: risk gate -> sleeves -> reports
+  orchestrator.py           the loop: learn -> risk gate -> sleeves -> reports
   ledger.py                 unified paper ledger (JSON state + trades.csv)
   risk.py                   fractional Kelly, daily loss limit, kill switch
+  learning.py               per-source scoring -> stake multipliers
+  analytics.py              equity curve, per-sleeve stats, attribution
+  news.py                   EDGAR 8-K / Yahoo / Google News search
+  preflight.py              --live-check credential/balance validation
   notify.py                 7am / 9pm webhook reports (REPORT_WEBHOOK_URL)
   sleeves/
     base.py                 Sleeve interface
     markets/                the original multi-strategy Alpaca bot
       strategies.py           signal generators (unchanged)
       broker.py               Alpaca data + OTO stop orders
+      simbroker.py            built-in paper account (Yahoo prices, no keys)
       sizing.py               ATR sizing + correlation filter
       sleeve.py
     polymarket/
       client.py               leaderboard / trades / midpoint / resolution
+      executor.py             paper (midpoint) or live FOK orders (py-clob)
       sleeve.py                leader discovery + copy logic + seatbelts
     sportsbook/
       oddsapi.py               The Odds API client

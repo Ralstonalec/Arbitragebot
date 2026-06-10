@@ -13,8 +13,9 @@ Every POLL_SECONDS it:
 import logging
 import time
 
-from . import config, notify
+from . import analytics, config, notify
 from .ledger import Ledger
+from .learning import Learner
 from .risk import RiskManager
 
 log = logging.getLogger("fund")
@@ -51,6 +52,9 @@ class Fund:
     def __init__(self):
         self.ledger = Ledger()
         self.risk = RiskManager(self.ledger)
+        # the self-learning layer: sleeves consult it for stake multipliers
+        self.learner = Learner(self.ledger)
+        self.ledger.learner = self.learner
         self.sleeves = []
         for name in config.ENABLED_SLEEVES:
             try:
@@ -78,6 +82,7 @@ class Fund:
 
     def cycle(self):
         equity = self.total_equity()
+        self.learner.refresh()  # re-score every source from realized outcomes
         allow_entries, reason = self.risk.check(equity)
         if not allow_entries:
             log.info("Entries paused: %s", reason)
@@ -86,6 +91,9 @@ class Fund:
                 sleeve.cycle(allow_entries)
             except Exception as e:
                 log.error("%s cycle failed: %s", sleeve.name, e)
+        analytics.record_equity(
+            self.total_equity(),
+            {s.name: (s.equity() or 0.0) for s in self.sleeves})
         notify.maybe_send_reports(self.ledger, self.sleeves)
 
     def run(self):
