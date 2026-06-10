@@ -2,6 +2,18 @@
 
 Production-oriented **odds intelligence** system for theoretical arbitrage and positive-EV detection across multiple sportsbooks. This is **not** a gambling operator: it does not hold funds, accept wagers, or store sportsbook credentials.
 
+## 🏦 The Fund (`apps/fund`)
+
+The repo also ships a Python **multi-sleeve fund manager** that hunts for
++EV across three venues under one bankroll and risk manager:
+
+- **markets** — multi-strategy Alpaca bot (mean reversion / momentum / trend, ATR sizing, hard stops)
+- **polymarket** — copy-trades consistently profitable wallets from the public PnL leaderboard
+- **sportsbook** — +EV vs the de-vigged Pinnacle line + cross-book arbitrage (paper, auto-settled)
+
+Paper-first, fractional-Kelly sizing, daily loss limit, and a drawdown kill
+switch. See [`apps/fund/README.md`](apps/fund/README.md).
+
 ## Architecture
 
 ```mermaid

@@ -11,3 +11,8 @@ apps/web/out
 *.tsbuildinfo
 mcps/
 agent-transcripts/
+
+# Python fund (apps/fund)
+__pycache__/
+*.pyc
+apps/fund/data/
