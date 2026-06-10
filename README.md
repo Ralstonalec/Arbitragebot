@@ -10,6 +10,7 @@ The repo also ships a Python **multi-sleeve fund manager** that hunts for
 - **markets** — multi-strategy Alpaca bot (mean reversion / momentum / trend, ATR sizing, hard stops)
 - **polymarket** — copy-trades consistently profitable wallets from the public PnL leaderboard
 - **sportsbook** — +EV vs the de-vigged Pinnacle line + cross-book arbitrage (paper, auto-settled)
+- **insiders** — copies disclosed trades of US politicians (STOCK Act, with a configurable Trump-emphasis multiplier) and superinvestor 13F filings (Buffett, Ackman, Druckenmiller, …)
 
 Paper-first, fractional-Kelly sizing, daily loss limit, and a drawdown kill
 switch. See [`apps/fund/README.md`](apps/fund/README.md).

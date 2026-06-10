@@ -9,6 +9,7 @@ positive expected value and put capital only where an edge is measurable.
 | **markets** | Multi-strategy Alpaca bot: mean reversion (SPY/QQQ), momentum breakout (BTC), trend following (GLD/USO). ATR sizing, hard 1% stops, correlation filter. | Real orders to Alpaca **paper** account |
 | **polymarket** | **Copy-trading consistent winners**: follows wallets that rank in the top-50 PnL on Polymarket on *both* the 1-week and 1-month leaderboards, and mirrors their entries/exits scaled to our bankroll. | Internal paper ledger at live CLOB prices |
 | **sportsbook** | **Piggybacking the sharps**: de-vigs Pinnacle's line into fair probabilities and bets soft books priced ≥3% above fair (+EV), plus cross-book arbitrage when best prices imply <100%. | Internal paper ledger, auto-settled from real scores |
+| **insiders** | **Copying disclosed trades of US politicians and top funds**: congressional STOCK Act filings (with a configurable "Trump factor" — emphasized names/tickers get 2× stake) and quarterly 13F filings of superinvestors (Buffett, Ackman, Druckenmiller, Tepper, Burry). | Real orders to the same Alpaca **paper** account, 15% exchange-side stops |
 
 ## ⚠️ Read this first
 
@@ -85,6 +86,24 @@ SB_SPORTS=basketball_nba,baseball_mlb,icehockey_nhl,soccer_epl
 3. Exits when they exit — plus its own seatbelts: 50% stop, take-profit
    near $0.98, and automatic settlement at resolution.
 
+**US politicians & top stock traders (insiders sleeve)** — two public
+disclosure streams, both with legally-mandated lag you cannot remove:
+1. *Congress*: STOCK Act periodic transaction reports (via Quiver
+   Quantitative if `QUIVER_API_KEY` is set, else Capitol Trades' public
+   endpoint). Purchases ≥ $15k are copied; the same filer selling closes
+   our copy; every position carries a 15% exchange-side stop and a 90-day
+   max hold. **The Trump factor**: Donald Trump as President files no
+   trade disclosures (PTRs come from members of Congress; the President
+   files only an annual form) — so the emphasis is implemented as a 2×
+   stake multiplier on (a) any filer whose name matches `trump` (family
+   members serving in Congress), (b) allies you list in
+   `INS_EMPHASIS_NAMES`, and (c) Trump-linked tickers (`DJT` by default).
+2. *Superinvestor 13Fs* (SEC EDGAR, free): when a tracked fund files a new
+   13F, new positions and >25% adds are copied at half weight (the data is
+   45+ days stale), and a fund fully exiting closes our copy. Issuer names
+   are mapped to tickers via the SEC registrant list (verified 26/26 on
+   Berkshire's live book).
+
 **Sports betting** — individual sharp bettors aren't publicly trackable, so
 the sleeve piggybacks the next best thing: **Pinnacle's line**, which is
 shaped by sharp money and is the industry benchmark for fair odds. Beating
@@ -126,6 +145,10 @@ fund/
       oddsapi.py               The Odds API client
       ev.py                    de-vig, +EV detection, arb math
       sleeve.py                scan, bet, auto-settle
+    insiders/
+      congress.py              STOCK Act filings (Quiver / Capitol Trades)
+      edgar.py                 SEC 13F diffing + issuer->ticker mapping
+      sleeve.py                copy logic, Trump emphasis, stops, max-hold
 ```
 
 A sleeve that's missing its API key or dependency disables itself with a

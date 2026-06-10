@@ -39,7 +39,9 @@ ALLOCATIONS = {
 }
 ENABLED_SLEEVES = [
     s.strip()
-    for s in os.environ.get("SLEEVES", "markets,polymarket,sportsbook").split(",")
+    for s in os.environ.get(
+        "SLEEVES", "markets,polymarket,sportsbook,insiders"
+    ).split(",")
     if s.strip()
 ]
 
@@ -133,6 +135,53 @@ PM_STOP_LOSS_FRAC = 0.50     # exit if mark drops 50% below our entry
 PM_TAKE_PROFIT_PRICE = 0.98  # exit when essentially resolved in our favor
 # Skip ultra-short markets (15-min crypto up/down etc.) — uncopyable noise.
 PM_SKIP_SLUG_PATTERNS = ("updown", "-15m-", "-1h-", "hourly")
+
+# ================================================================== insiders
+# Copy-trades two public disclosure streams through the Alpaca account:
+# congressional STOCK Act filings and superinvestor 13F filings.
+QUIVER_API_KEY = os.environ.get("QUIVER_API_KEY", "")  # optional, best source
+EDGAR_USER_AGENT = os.environ.get(
+    "EDGAR_USER_AGENT", "fund-bot admin@example.com"  # SEC requires a contact UA
+)
+
+INS_LOOKBACK_DAYS = int(os.environ.get("INS_LOOKBACK_DAYS", "30"))
+INS_MIN_TRADE_USD = float(os.environ.get("INS_MIN_TRADE_USD", "15000"))
+INS_BASE_STAKE_PCT = float(os.environ.get("INS_BASE_STAKE_PCT", "0.01"))
+INS_MAX_POSITIONS = int(os.environ.get("INS_MAX_POSITIONS", "10"))
+INS_MAX_HOLD_DAYS = int(os.environ.get("INS_MAX_HOLD_DAYS", "90"))
+
+# Empty = follow every filer above the size floor; otherwise only filers
+# whose name contains one of these (comma-separated, case-insensitive).
+INS_FOLLOW_POLITICIANS = [
+    p.strip().lower()
+    for p in os.environ.get("INS_FOLLOW_POLITICIANS", "").split(",")
+    if p.strip()
+]
+# Emphasis ("the Trump factor"): filers matching these names and trades in
+# these tickers get INS_EMPHASIS_MULT x stake. Donald Trump as President
+# files no trade disclosures — this catches Trump family members in
+# Congress, allies you add, and Trump-linked tickers.
+INS_EMPHASIS_NAMES = ["trump"] + [
+    n.strip().lower()
+    for n in os.environ.get("INS_EMPHASIS_NAMES", "").split(",")
+    if n.strip()
+]
+INS_EMPHASIS_TICKERS = {
+    t.strip().upper()
+    for t in os.environ.get("INS_EMPHASIS_TICKERS", "DJT").split(",")
+    if t.strip()
+}
+INS_EMPHASIS_MULT = float(os.environ.get("INS_EMPHASIS_MULT", "2.0"))
+
+# Superinvestor 13F funds to track: {display name: CIK}.
+INS_13F_FUNDS = {
+    "Berkshire Hathaway (Buffett)": "0001067983",
+    "Pershing Square (Ackman)": "0001336528",
+    "Duquesne Family Office (Druckenmiller)": "0001536411",
+    "Appaloosa (Tepper)": "0001656456",
+    "Scion Asset Management (Burry)": "0001649339",
+}
+INS_13F_WEIGHT = 0.5  # 13Fs are 45+ days stale -> half-size copies
 
 # ================================================================ sportsbook
 THE_ODDS_API_KEY = os.environ.get("THE_ODDS_API_KEY", "")

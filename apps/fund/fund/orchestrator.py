@@ -32,6 +32,9 @@ def _load_sleeve_class(name: str):
     if name == "sportsbook":
         from .sleeves.sportsbook.sleeve import SportsbookSleeve
         return SportsbookSleeve
+    if name == "insiders":
+        from .sleeves.insiders.sleeve import InsidersSleeve
+        return InsidersSleeve
     return None
 
 
